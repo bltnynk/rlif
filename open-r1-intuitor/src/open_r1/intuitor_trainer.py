@@ -160,7 +160,7 @@ class RepeatSampler(Sampler):
 
         #    [[2, 4, 3], [1, 0, 6], [5]]
         # -> [[2, 4, 3], [1, 0, 6]]
-        indexes = [chunk for chunk in indexes if len(chunk) == self.batch_size]
+        indexes = [chunk for chunk in indexes if len(chunk) == self.batch_size] # batch_size ~ total_train_batch_size / num_generations
 
         for chunk in indexes:
             for _ in range(self.repeat_count):
@@ -169,7 +169,7 @@ class RepeatSampler(Sampler):
                         yield index
 
     def __len__(self) -> int:
-        return self.num_samples * self.mini_repeat_count * self.repeat_count
+        return self.num_samples * self.mini_repeat_count * self.repeat_count # so num_samples ~ dataset_size, mini_repeat_count ~ num_generations, repeat_count ~ num_iterations * gradient_accumulation_steps
 
 
 class RepeatRandomSampler(RepeatSampler):
@@ -361,8 +361,8 @@ class INTUITORTrainer(Trainer):
         args: Optional[GRPOConfig] = None,
         train_dataset: Optional[Union[Dataset, IterableDataset]] = None,
         eval_dataset: Optional[Union[Dataset, IterableDataset, dict[str, Union[Dataset, IterableDataset]]]] = None,
-        processing_class: Optional[PreTrainedTokenizerBase] = None,
-        reward_processing_classes: Optional[Union[PreTrainedTokenizerBase, list[PreTrainedTokenizerBase]]] = None,
+        processing_class: Optional[PreTrainedTokenizerBase] = None, # this basically is the tokenizer
+        reward_processing_classes: Optional[Union[PreTrainedTokenizerBase, list[PreTrainedTokenizerBase]]] = None, # basically the tokenizer for the reward model
         callbacks: Optional[list[TrainerCallback]] = None,
         optimizers: tuple[Optional[torch.optim.Optimizer], Optional[torch.optim.lr_scheduler.LambdaLR]] = (None, None),
         peft_config: Optional["PeftConfig"] = None,
@@ -464,7 +464,8 @@ class INTUITORTrainer(Trainer):
         else:
             self.reward_weights = torch.ones(len(reward_funcs), dtype=torch.float32)
 
-        # Reward processing class
+        # Reward processing class, basically initializes the tokenizer for the reward model. If reward function is not a model, the corresponding entry in
+        # `reward_processing_classes` is ignored.
         if reward_processing_classes is None:
             reward_processing_classes = [None] * len(reward_funcs)
         elif not isinstance(reward_processing_classes, list):
@@ -761,7 +762,7 @@ class INTUITORTrainer(Trainer):
             data_source=self.train_dataset,
             mini_repeat_count=self.num_generations,
             batch_size=effective_batch_size // self.num_generations,
-            repeat_count=self.num_iterations * self.args.gradient_accumulation_steps,
+            repeat_count=self.num_iterations * self.args.gradient_accumulation_steps, # this may seem strange but in fact it's necessary: we duplicate the effective batch by grad_accumulation_steps times but at each step we only use one slice of the batch.
             shuffle=self.shuffle_dataset,
             seed=self.args.seed,
         )
