@@ -816,7 +816,8 @@ class INTUITORTrainer(Trainer):
             input_ids_batch = input_ids[i : i + batch_size]
             attention_mask_batch = attention_mask[i : i + batch_size]
 
-            # We add 1 to `logits_to_keep` because the last logits of the sequence is later excluded
+            # We add 1 to `logits_to_keep` because the last logits of the sequence is later excluded.
+            # To add on, this make sense since the logits are computed for the next token prediction, and we want to shift left by one to take the actual logits of the input.
             logits = model(
                 input_ids=input_ids_batch, attention_mask=attention_mask_batch, logits_to_keep=logits_to_keep + 1
             ).logits
@@ -1015,6 +1016,7 @@ class INTUITORTrainer(Trainer):
             # Broadcast the completions from the main process to all processes, ensuring each process receives its
             # corresponding slice.
             completion_ids = broadcast_object_list(completion_ids, from_process=0)
+            # After broadcasting, this process_slice ensures that each process only access and process its own slice.
             process_slice = slice(
                 self.accelerator.process_index * len(prompts),
                 (self.accelerator.process_index + 1) * len(prompts),
@@ -1035,6 +1037,7 @@ class INTUITORTrainer(Trainer):
                 )
 
             # Compute prompt length and extract completion ids
+            # This works because we are padding left.
             prompt_length = prompt_ids.size(1)
             prompt_ids = prompt_completion_ids[:, :prompt_length]
             completion_ids = prompt_completion_ids[:, prompt_length:]
@@ -1052,7 +1055,7 @@ class INTUITORTrainer(Trainer):
             completion_mask = completion_mask * (~truncated_completions).unsqueeze(1).int()
 
         # Concatenate prompt_mask with completion_mask for logit computation
-        attention_mask = torch.cat([prompt_mask, completion_mask], dim=1)  # (B, P+C)
+        attention_mask = torch.cat([prompt_mask, completion_mask], dim=1)  # (B, P+C) (P includes padding at the beginning, C includes padding on the right)
 
         logits_to_keep = completion_ids.size(1)  # we only need to compute the logits for the completion tokens
         batch_size = self.args.per_device_train_batch_size if mode == "train" else self.args.per_device_eval_batch_size
