@@ -196,4 +196,7 @@ class FSDPVLLMShardingManager(BaseShardingManager):
         patch_vllm_moe_model_weight_loader(model)
         device = torch.cuda.current_device()  # used when fsdp2 set cpu_offload_policy
         loaded_params = model.load_weights(((name, param.to(device, non_blocking=True).full_tensor() if isinstance(param, DTensor) else param) for name, param in updated_params.items()))
+        if loaded_params is None:          # weight sync was a no-op
+            logger.info("vLLM load weights: params unchanged (skip len())")
+            return                         # or just fall through
         logger.info("vLLM load weights, loaded_params: %d", len(loaded_params))

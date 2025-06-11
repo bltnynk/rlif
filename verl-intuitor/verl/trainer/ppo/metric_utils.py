@@ -165,6 +165,24 @@ def compute_data_metrics(batch: DataProto, use_critic: bool = True) -> Dict[str,
         "prompt_length/min": torch.min(prompt_length).detach().item(),
         "prompt_length/clip_ratio": torch.mean(torch.eq(prompt_length, max_prompt_length).float()).detach().item(),
     }
+
+    # Add self-certainty metrics if available
+    if "self_certaintys" in batch.batch:
+        self_certaintys = batch.batch["self_certaintys"]  # shape: [B, T]
+        # response_mask is already computed and is boolean, convert to float for calculations
+        float_response_mask = response_mask.float() # shape: [B, T]
+
+        # Compute sentence-wise mean self-certainty
+        masked_certainty = self_certaintys * float_response_mask  # [B, T]
+        sum_certainty = masked_certainty.sum(dim=-1)  # [B]
+        count = float_response_mask.sum(dim=-1) + 1e-8  # avoid divide-by-zero; [B]
+        sentence_wise_mean_certainty = sum_certainty / count  # [B]
+
+        metrics.update({
+            "self_certainty/mean": torch.mean(sentence_wise_mean_certainty).detach().item(),
+            "self_certainty/max": torch.max(sentence_wise_mean_certainty).detach().item(),
+            "self_certainty/min": torch.min(sentence_wise_mean_certainty).detach().item(),
+        })
     return metrics
 
 
@@ -172,7 +190,7 @@ def compute_timing_metrics(batch: DataProto, timing_raw: Dict[str, float]) -> Di
     """
     Computes timing metrics for different processing stages in PPO training.
     
-    This function calculates both raw timing metrics (in seconds) and per-token timing metrics 
+    This function calculates both raw timing metrics (in seconds) and per-token timing in milliseconds 
     (in milliseconds) for various processing stages like generation, reference computation, 
     value computation, advantage computation, and model updates.
 
