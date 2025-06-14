@@ -81,7 +81,7 @@ bash run_intuitor_code.sh
 First, download the MATH dataset and prepare it using the following Python script:
 
 ```bash
-python examples/data_preprocess/math_dataset.py
+python examples/data_preprocess/math_dataset.py --model Qwen2.5-3B
 ```
 
 Then, run the following command to start the training (Modify the WANDB_KEY in the `math_intuitor.sh` script to your own WANDB key.):

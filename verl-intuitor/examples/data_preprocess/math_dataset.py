@@ -32,7 +32,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--local_dir", default="~/data/math")
     parser.add_argument("--hdfs_dir", default=None)
-    parser.add_argument("--model", default="7B", choices=["1.5B", "3B", "7B"])
+    parser.add_argument("--model", default="other", choices=["Qwen2.5-1.5B", "Qwen2.5-3B", "Qwen2.5-7B", "other"])
     parser.add_argument("--seed", type=int, default=42, help="Random seed for shuffling the dataset")
 
     args = parser.parse_args()
@@ -46,18 +46,19 @@ if __name__ == "__main__":
     train_dataset = dataset["train"]
     test_dataset = dataset["test"]
 
+    instruction_following_0 = "Let's think step by step and output the final answer within \\boxed{}."
     instruction_following_1 = "You are a helpful AI Assistant, designed to provide well-reasoned and detailed responses. You FIRST think about the reasoning process step by step and then provide the user with the answer. Please enclose your final answer in the box: \\boxed{Your Answer}."
     instruction_following_2 = "You are a helpful AI Assistant, designed to provide well-reasoned and detailed responses. You FIRST think about the reasoning process step by step and then provide the user with the answer. Please enclose your final answer in the box: \\boxed{Your Answer}. Please stop generation immediately after outputing the box."
     instruction_following_3 = "You are a helpful AI Assistant, designed to provide well-reasoned and detailed responses. Please provide a step-by-step solution to the following problem."
 
-    if args.model == "1.5B":
+    if args.model == "Qwen2.5-1.5B":
         instruction_following = instruction_following_1
-    elif args.model == "3B":
+    elif args.model == "Qwen2.5-3B":
         instruction_following = instruction_following_2
-    elif args.model == "7B":
+    elif args.model == "Qwen2.5-7B":
         instruction_following = instruction_following_3
     else:
-        raise ValueError(f"Unsupported model for system prompt. For out of scope model, we recommend using 7B system prompt for the first trial.")
+        instruction_following = instruction_following_0
         
     # add a row to each data item that represents a unique id
     def make_map_fn(split):
